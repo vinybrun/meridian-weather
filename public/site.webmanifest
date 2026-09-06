@@ -1,0 +1,17 @@
+{
+  "name": "Meridian Weather",
+  "short_name": "Meridian",
+  "description": "Search any city or use your location for current conditions and a 7-day forecast.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#070b14",
+  "theme_color": "#0b1220",
+  "icons": [
+    {
+      "src": "./favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
