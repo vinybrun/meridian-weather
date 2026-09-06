@@ -108,7 +108,7 @@ If reverse geocoding fails, the app still loads weather and labels the pin “Yo
 
 ## Remaining risks
 
-- Open-Meteo and BigDataCloud are third-party, CORS-open, rate-limited services. Outages or stricter CORS will surface as the in-app error state.
+- Open-Meteo and BigDataCloud are third-party, CORS-open, rate-limited services. Forecast requests retry twice on HTTP 429/503; a longer outage or stricter CORS still surfaces as the in-app error state.
 - Browser geolocation requires HTTPS (or localhost) and an explicit user grant.
 - Geocoding can miss small hamlets or ambiguous names; the invalid-city state covers that.
 - Hourly and daily times are interpreted from Open-Meteo’s local ISO strings for the place timezone, not the viewer’s clock.

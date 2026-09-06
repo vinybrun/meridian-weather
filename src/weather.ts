@@ -48,11 +48,17 @@ export type Weather = {
 
 export class WeatherError extends Error {
   readonly kind: 'network' | 'not-found' | 'unavailable' | 'geo'
+  readonly retryable: boolean
 
-  constructor(kind: 'network' | 'not-found' | 'unavailable' | 'geo', message: string) {
+  constructor(
+    kind: 'network' | 'not-found' | 'unavailable' | 'geo',
+    message: string,
+    retryable = false,
+  ) {
     super(message)
     this.name = 'WeatherError'
     this.kind = kind
+    this.retryable = retryable
   }
 }
 
@@ -262,7 +268,25 @@ type GeoHit = {
   admin1?: string
 }
 
-async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason instanceof Error ? signal.reason : new DOMException('Aborted', 'AbortError'))
+      return
+    }
+    const onAbort = () => {
+      globalThis.clearTimeout(timer)
+      reject(signal?.reason instanceof Error ? signal.reason : new DOMException('Aborted', 'AbortError'))
+    }
+    const timer = globalThis.setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
+}
+
+async function getJsonOnce<T>(url: string, signal?: AbortSignal): Promise<T> {
   const controller = new AbortController()
   const timer = globalThis.setTimeout(() => controller.abort(), 12_000)
   const onAbort = () => controller.abort()
@@ -271,7 +295,11 @@ async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   try {
     const response = await fetch(url, { signal: controller.signal, headers: { Accept: 'application/json' } })
     if (!response.ok) {
-      throw new WeatherError('unavailable', 'The weather service is temporarily unavailable.')
+      throw new WeatherError(
+        'unavailable',
+        'The weather service is temporarily unavailable.',
+        response.status === 429 || response.status === 503,
+      )
     }
     return (await response.json()) as T
   } catch (error) {
@@ -285,6 +313,22 @@ async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
     globalThis.clearTimeout(timer)
     signal?.removeEventListener('abort', onAbort)
   }
+}
+
+async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
+  const attempts = 3
+  let lastError: unknown
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      return await getJsonOnce<T>(url, signal)
+    } catch (error) {
+      lastError = error
+      const busy = error instanceof WeatherError && error.retryable
+      if (!busy || attempt === attempts - 1) throw error
+      await sleep(350 * 2 ** attempt, signal)
+    }
+  }
+  throw lastError
 }
 
 export async function searchPlaces(query: string, signal?: AbortSignal): Promise<Place[]> {

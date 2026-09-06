@@ -248,4 +248,70 @@ describe('fetchWeather mapping', () => {
       globalThis.fetch = original
     }
   })
+
+  it('retries a 503 forecast response and then succeeds', async () => {
+    const original = globalThis.fetch
+    let calls = 0
+    const hours = Array.from({ length: 24 }, (_, i) => `2026-09-06T${String(i).padStart(2, '0')}:00`)
+    globalThis.fetch = async () => {
+      calls += 1
+      if (calls < 3) return new Response('{"error":true}', { status: 503 })
+      return new Response(
+        JSON.stringify({
+          timezone: 'UTC',
+          current: {
+            time: '2026-09-06T00:00',
+            temperature_2m: 11,
+            apparent_temperature: 10,
+            relative_humidity_2m: 40,
+            weather_code: 0,
+            wind_speed_10m: 5,
+            wind_direction_10m: 0,
+            is_day: 1,
+          },
+          hourly: { time: hours, temperature_2m: hours.map(() => 11), weather_code: hours.map(() => 0) },
+          daily: { time: ['2026-09-06'], weather_code: [0], temperature_2m_max: [12], temperature_2m_min: [8] },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      )
+    }
+    try {
+      const weather = await fetchWeather({
+        id: '1',
+        name: 'Lisbon',
+        country: 'Portugal',
+        latitude: 38.72,
+        longitude: -9.14,
+      })
+      assert.equal(calls, 3)
+      assert.equal(weather.current.temperature, 11)
+    } finally {
+      globalThis.fetch = original
+    }
+  })
+
+  it('does not retry a non-overload forecast error', async () => {
+    const original = globalThis.fetch
+    let calls = 0
+    globalThis.fetch = async () => {
+      calls += 1
+      return new Response('nope', { status: 500 })
+    }
+    try {
+      await assert.rejects(
+        () =>
+          fetchWeather({
+            id: '1',
+            name: 'Lisbon',
+            country: 'Portugal',
+            latitude: 38.72,
+            longitude: -9.14,
+          }),
+        (err: unknown) => err instanceof WeatherError && err.kind === 'unavailable' && !err.retryable,
+      )
+      assert.equal(calls, 1)
+    } finally {
+      globalThis.fetch = original
+    }
+  })
 })
