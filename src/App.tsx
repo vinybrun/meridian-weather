@@ -128,6 +128,10 @@ export default function App() {
     if (saved) void loadForPlace(saved)
   }, [loadForPlace, loadQuery])
 
+  useEffect(() => {
+    document.title = place && status === 'ready' ? `${place.name} — Meridian Weather` : 'Meridian — Weather'
+  }, [place, status])
+
   useEffect(() => () => abortRef.current?.abort(), [])
 
   const showLanding = status === 'idle' && !weather
@@ -267,11 +271,12 @@ function Search({
       setSuggesting(false)
       return
     }
+    setSuggestions([])
+    setSuggesting(true)
     const handle = window.setTimeout(() => {
       abortRef.current?.abort()
       const controller = new AbortController()
       abortRef.current = controller
-      setSuggesting(true)
       void searchPlaces(trimmed, controller.signal)
         .then((places) => {
           if (controller.signal.aborted) return
@@ -287,7 +292,10 @@ function Search({
           if (!controller.signal.aborted) setSuggesting(false)
         })
     }, 260)
-    return () => window.clearTimeout(handle)
+    return () => {
+      window.clearTimeout(handle)
+      abortRef.current?.abort()
+    }
   }, [query])
 
   useEffect(() => {
