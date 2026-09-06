@@ -306,6 +306,7 @@ dd {
 }
 
 .top {
+  z-index: 4;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 16px 20px;
@@ -531,6 +532,16 @@ dd {
   border-radius: 14px;
   background: color-mix(in srgb, #120e08 55%, transparent);
   color: var(--accent);
+}
+
+.banner button {
+  margin-left: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .status-panel {
