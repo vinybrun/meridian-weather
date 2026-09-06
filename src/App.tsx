@@ -70,7 +70,13 @@ export default function App() {
       if (controller.signal.aborted || isAbortError(err)) return
       if (err instanceof WeatherError) {
         setError(err.message)
-        setStatus(err.kind === 'not-found' ? 'not-found' : err.kind === 'geo' ? 'geo' : 'error')
+        if (err.kind === 'not-found') {
+          setWeather(null)
+          setPlace(null)
+          setStatus('not-found')
+          return
+        }
+        setStatus(err.kind === 'geo' ? 'geo' : 'error')
         return
       }
       setError('Something went wrong while loading the weather.')
@@ -160,6 +166,7 @@ export default function App() {
           query={query}
           onQuery={setQuery}
           loading={status === 'loading'}
+          invalid={status === 'not-found'}
           showHints={showLanding || showErrorOnly}
           onSelect={loadForPlace}
           onSearch={loadQuery}
@@ -241,6 +248,7 @@ function Search({
   query,
   onQuery,
   loading,
+  invalid,
   showHints,
   onSelect,
   onSearch,
@@ -249,6 +257,7 @@ function Search({
   query: string
   onQuery: (value: string) => void
   loading: boolean
+  invalid: boolean
   showHints: boolean
   onSelect: (place: Place) => void
   onSearch: (query: string) => void
@@ -367,6 +376,7 @@ function Search({
           spellCheck={false}
           enterKeyHint="search"
           role="combobox"
+          aria-invalid={invalid || undefined}
           aria-expanded={showList && suggestions.length > 0}
           aria-controls={listId}
           aria-autocomplete="list"

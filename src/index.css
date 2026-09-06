@@ -352,6 +352,10 @@ dd {
   backdrop-filter: blur(16px);
 }
 
+.search:has([aria-invalid='true']) {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line-strong));
+}
+
 .search-glyph {
   color: var(--paper-dim);
   font-size: 18px;
