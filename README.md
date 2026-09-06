@@ -12,6 +12,7 @@ A public weather instrument: search any city, or use the browser’s location, a
 - °C / °F toggle (also converts wind to mph)
 - Next 24 hours and a 7-day outlook
 - Weather-tinted atmosphere, loading and error states, invalid-city handling
+- Shareable city links via `?q=Lisbon`
 - Last place and unit preference stay in this browser
 
 ## Run locally

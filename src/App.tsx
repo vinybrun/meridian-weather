@@ -369,7 +369,13 @@ function Search({
           <button className="go" type="submit" disabled={loading || query.trim().length === 0}>
             Search
           </button>
-          <button className="locate" type="button" onClick={onLocate} disabled={loading}>
+          <button
+            className="locate"
+            type="button"
+            onClick={onLocate}
+            disabled={loading}
+            aria-label="Use my location"
+          >
             <LocateIcon />
             <span>Use my location</span>
           </button>
