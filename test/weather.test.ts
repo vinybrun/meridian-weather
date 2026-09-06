@@ -15,6 +15,7 @@ import {
   formatWind,
   iconKind,
   lookupPlace,
+  mapForecast,
   toTemp,
   weatherTheme,
 } from '../src/weather.ts'
@@ -138,6 +139,55 @@ describe('city lookup', () => {
 })
 
 describe('forecast mapping', () => {
+  it('keeps the current hour and the next 24, plus 7 daily rows', () => {
+    const weather = mapForecast({
+      timezone: 'Europe/Lisbon',
+      current: {
+        time: '2026-09-06T15:00',
+        temperature_2m: 30.4,
+        apparent_temperature: 32.2,
+        relative_humidity_2m: 45,
+        weather_code: 1,
+        wind_speed_10m: 12,
+        wind_direction_10m: 270,
+        is_day: 1,
+        surface_pressure: 1014,
+      },
+      hourly: {
+        time: ['2026-09-06T14:00', '2026-09-06T15:00', '2026-09-06T16:00'],
+        temperature_2m: [29, 30.4, 29.1],
+        weather_code: [1, 1, 2],
+        precipitation_probability: [0, 5, 10],
+      },
+      daily: {
+        time: ['2026-09-06', '2026-09-07', '2026-09-08'],
+        weather_code: [1, 2, 61],
+        temperature_2m_max: [31, 28, 24],
+        temperature_2m_min: [19, 18, 17],
+        precipitation_probability_max: [5, 20, 80],
+        sunrise: ['2026-09-06T07:10', '2026-09-07T07:11', '2026-09-08T07:12'],
+        sunset: ['2026-09-06T19:50', '2026-09-07T19:48', '2026-09-08T19:46'],
+      },
+    })
+
+    assert.equal(weather.current.temperature, 30.4)
+    assert.equal(weather.current.feelsLike, 32.2)
+    assert.equal(weather.current.isDay, true)
+    assert.equal(weather.hourly[0]?.time, '2026-09-06T15:00')
+    assert.equal(weather.hourly.length, 2)
+    assert.equal(weather.daily.length, 3)
+    assert.equal(weather.daily[2]?.weatherCode, 61)
+  })
+
+  it('rejects an incomplete payload', () => {
+    assert.throws(
+      () => mapForecast({ timezone: 'UTC' }),
+      (err: unknown) => err instanceof WeatherError && err.kind === 'unavailable',
+    )
+  })
+})
+
+describe('fetchWeather mapping', () => {
   it('maps current, hourly, and 7 daily points from Open-Meteo', async () => {
     const original = globalThis.fetch
     const hours = Array.from({ length: 48 }, (_, i) => {

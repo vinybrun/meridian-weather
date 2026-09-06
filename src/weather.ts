@@ -348,6 +348,82 @@ export async function reverseGeocode(
   }
 }
 
+type ForecastPayload = {
+  timezone?: string
+  current?: {
+    time: string
+    temperature_2m: number
+    apparent_temperature: number
+    relative_humidity_2m: number
+    weather_code: number
+    wind_speed_10m: number
+    wind_direction_10m: number
+    is_day: number
+    surface_pressure?: number
+  }
+  hourly?: {
+    time?: string[]
+    temperature_2m?: number[]
+    weather_code?: number[]
+    precipitation_probability?: Array<number | null>
+  }
+  daily?: {
+    time?: string[]
+    weather_code?: number[]
+    temperature_2m_max?: number[]
+    temperature_2m_min?: number[]
+    precipitation_probability_max?: Array<number | null>
+    sunrise?: string[]
+    sunset?: string[]
+  }
+}
+
+export function mapForecast(data: ForecastPayload): Weather {
+  const current = data.current
+  const hourlyTime = data.hourly?.time
+  const dailyTime = data.daily?.time
+  if (!current || !hourlyTime || !dailyTime) {
+    throw new WeatherError('unavailable', 'The weather service returned an incomplete forecast.')
+  }
+
+  const cursor = current.time.slice(0, 13)
+  let start = hourlyTime.findIndex((time) => time.slice(0, 13) >= cursor)
+  if (start < 0) start = 0
+
+  return {
+    timezone: data.timezone || 'UTC',
+    current: {
+      time: current.time,
+      temperature: current.temperature_2m,
+      feelsLike: current.apparent_temperature,
+      humidity: current.relative_humidity_2m,
+      windSpeed: current.wind_speed_10m,
+      windDirection: current.wind_direction_10m,
+      weatherCode: current.weather_code,
+      isDay: current.is_day === 1,
+      pressure: current.surface_pressure ?? null,
+    },
+    hourly: hourlyTime.slice(start, start + 24).map((time, offset) => {
+      const i = start + offset
+      return {
+        time,
+        temperature: data.hourly?.temperature_2m?.[i] ?? 0,
+        weatherCode: data.hourly?.weather_code?.[i] ?? 0,
+        precipProb: data.hourly?.precipitation_probability?.[i] ?? null,
+      }
+    }),
+    daily: dailyTime.slice(0, 7).map((date, i) => ({
+      date,
+      weatherCode: data.daily?.weather_code?.[i] ?? 0,
+      tMax: data.daily?.temperature_2m_max?.[i] ?? 0,
+      tMin: data.daily?.temperature_2m_min?.[i] ?? 0,
+      precipProb: data.daily?.precipitation_probability_max?.[i] ?? null,
+      sunrise: data.daily?.sunrise?.[i] ?? null,
+      sunset: data.daily?.sunset?.[i] ?? null,
+    })),
+  }
+}
+
 export async function fetchWeather(place: Place, signal?: AbortSignal): Promise<Weather> {
   const url = new URL(FORECAST)
   url.searchParams.set('latitude', String(place.latitude))
@@ -365,72 +441,7 @@ export async function fetchWeather(place: Place, signal?: AbortSignal): Promise<
   url.searchParams.set('forecast_days', '7')
   url.searchParams.set('wind_speed_unit', 'kmh')
 
-  const data = await getJson<{
-    timezone: string
-    current: {
-      time: string
-      temperature_2m: number
-      apparent_temperature: number
-      relative_humidity_2m: number
-      weather_code: number
-      wind_speed_10m: number
-      wind_direction_10m: number
-      is_day: number
-      surface_pressure?: number
-    }
-    hourly: {
-      time: string[]
-      temperature_2m: number[]
-      weather_code: number[]
-      precipitation_probability?: Array<number | null>
-    }
-    daily: {
-      time: string[]
-      weather_code: number[]
-      temperature_2m_max: number[]
-      temperature_2m_min: number[]
-      precipitation_probability_max?: Array<number | null>
-      sunrise?: string[]
-      sunset?: string[]
-    }
-  }>(url.toString(), signal)
-
-  const cursor = data.current.time.slice(0, 13)
-  let start = data.hourly.time.findIndex((time) => time.slice(0, 13) >= cursor)
-  if (start < 0) start = 0
-
-  return {
-    timezone: data.timezone,
-    current: {
-      time: data.current.time,
-      temperature: data.current.temperature_2m,
-      feelsLike: data.current.apparent_temperature,
-      humidity: data.current.relative_humidity_2m,
-      windSpeed: data.current.wind_speed_10m,
-      windDirection: data.current.wind_direction_10m,
-      weatherCode: data.current.weather_code,
-      isDay: data.current.is_day === 1,
-      pressure: data.current.surface_pressure ?? null,
-    },
-    hourly: data.hourly.time.slice(start, start + 24).map((time, offset) => {
-      const i = start + offset
-      return {
-        time,
-        temperature: data.hourly.temperature_2m[i] ?? 0,
-        weatherCode: data.hourly.weather_code[i] ?? 0,
-        precipProb: data.hourly.precipitation_probability?.[i] ?? null,
-      }
-    }),
-    daily: data.daily.time.slice(0, 7).map((date, i) => ({
-      date,
-      weatherCode: data.daily.weather_code[i] ?? 0,
-      tMax: data.daily.temperature_2m_max[i] ?? 0,
-      tMin: data.daily.temperature_2m_min[i] ?? 0,
-      precipProb: data.daily.precipitation_probability_max?.[i] ?? null,
-      sunrise: data.daily.sunrise?.[i] ?? null,
-      sunset: data.daily.sunset?.[i] ?? null,
-    })),
-  }
+  return mapForecast(await getJson<ForecastPayload>(url.toString(), signal))
 }
 
 export function readPosition(): Promise<GeolocationPosition> {
